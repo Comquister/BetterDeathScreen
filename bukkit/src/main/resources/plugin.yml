@@ -1,0 +1,16 @@
+name: BetterDeathScreen
+main: com.github.victortedesco.betterdeathscreen.bukkit.BetterDeathScreen
+description: Plugin that offers a wide variety of options to customize the death screen of Minecraft.
+version: ${project.version}
+author: Tedesk
+load: POSTWORLD
+depend: [ ProtocolLib ]
+softdepend: [ PlaceholderAPI ]
+api-version: 1.13
+website: https://github.com/victortedesco/BetterDeathScreen
+
+commands:
+  bds:
+    description: Main command of the plugin.
+    usage: /<command>
+    aliases: [ betterdeathscreen ]

@@ -1,0 +1,59 @@
+misc:
+  command-blocked: "&cVocê não pode usar esse comando, pois está morto."
+  time:
+    singular: " segundo"
+    plural: " segundos"
+death:
+  kill: # This section uses the victim for the placeholders.
+    - "&cVocê matou &f%player_name%!"
+    - "&6Parabéns por ter matado &f%player_name%"
+    - "&bVocê é bom nisso! &f%player_name% &7está impressionado."
+  killed: # This section uses the victim for the placeholders.
+    - "&cVOCÊ FOI ELIMINADO\n&7Vencer significa ser melhor."
+    - "&cVOCÊ MORREU\n&7Vencer significa ser melhor."
+    - "&cVOCÊ FOI ELIMINADO\n&7Paciência é o que separa os caçadores bons dos mortos."
+    - "&cVOCÊ MORREU\n&7Paciência é o que separa os caçadores bons dos mortos."
+    - "&cVOCÊ FOI ELIMINADO\n&7Já caiu no esquecimento..."
+    - "&cVOCÊ MORREU\n&7Já caiu no esquecimento..."
+    - "&cVOCÊ FOI ELIMINADO\n&7Isso foi no máximo... mediocre."
+    - "&cVOCÊ MORREU\n&7Isso foi no máximo... mediocre."
+    - "&cVOCÊ FOI ELIMINADO\n&7Você não é o herói desse história, você não é nada!"
+    - "&cVOCÊ MORREU\n&7Você não é o herói desse história, você não é nada!"
+    - "&cVOCÊ FOI ELIMINADO\n&7Resultados dizem mais do que palavras."
+    - "&cVOCÊ MORREU\n&7Resultados dizem mais do que palavras."
+    - "&cVOCÊ FOI ELIMINADO\n&7Preste atenção!"
+    - "&cVOCÊ MORREU\n&7Preste atenção!"
+  killed-by-player: # This section uses the killer for the placeholders.
+    - "&cVOCÊ FOI ELIMINADO\n&7Alguém te deu uma aula."
+    - "&cVOCÊ MORREU\n&7Alguém te deu uma aula."
+    - "&cVOCÊ FOI ELIMINADO\n&7%player_name% disse bom dia."
+    - "&cVOCÊ MORREU\n&7%player_name% disse bom dia."
+    - "&cVOCÊ FOI ELIMINADO\n&7%player_name% só é melhor."
+    - "&cVOCÊ MORREU\n&7%player_name% só é melhor."
+    - "&cVOCÊ FOI ELIMINADO\n&7Seu inimigo ficou vivo com &c%player_health_rounded% ❤"
+    - "&cVOCÊ MORREU\n&7Seu inimigo ficou vivo com &c%player_health_rounded% ❤"
+respawn:
+  non-hardcore-countdown: "&7Você ressurgirá em &6%time%."
+  hardcore-countdown: "&cVocê não irá renascer..."
+commands:
+  help:
+    - "&cBetterDeathScreen &f| Comandos"
+    - ""
+    - "&c/bds reload &7- &fRecarrega as configurações do plugin."
+    - "&c/bds respawn (player) &7- &fForça o jogador a renascer. (Funciona no hardcore)"
+  reloaded: "&aPlugin recarregado com sucesso."
+  without-permission: "&cVocê não tem permissão para usar esse comando."
+plugin:
+  incompatible:
+    - "&cSeu servidor não está usando um fork do Spigot ou está usando uma versão mais antiga que a 1.8!"
+    - "&cSe você acha que isso é um erro, contate o criador do plugin &fTedesk"
+    - "&cO plugin será desativado."
+  enabled:
+    - "&aPlugin ativado!"
+  disabled:
+    - "&cPlugin desativado!"
+  update-available:
+    - "&aBetterDeathScreen &f| (%current_version%) -> (%latest_version%)"
+    - ""
+    - "&eO plugin pode ser atualizado!"
+    - "&7Download: &f%release_link%"
