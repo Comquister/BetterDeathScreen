@@ -13,15 +13,17 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("UnstableApiUsage")
 @Getter
 public class UpdateChecker {
     private static final String GITHUB_LINK = "https://api.github.com/repos/VictorTedesco/BetterDeathScreen/releases";
     private static final Gson SERIALIZER = new GsonBuilder().serializeNulls().create();
-    private final String currentVersion = BetterDeathScreen.getInstance().getDescription().getVersion();
     private final BetterDeathScreen plugin;
+    private final String currentVersion;
 
     @Setter
     private GitHubRelease lastRelease;
@@ -29,11 +31,12 @@ public class UpdateChecker {
     private String response;
 
     public UpdateChecker(BetterDeathScreen plugin) {
-        this.plugin = plugin; // ✅ Agora está correto
+        this.plugin = plugin; // ✅ First, initialize 'plugin'
+        this.currentVersion = plugin.getPluginMeta().getVersion(); // ✅ Now it's safe to access
         this.check();
         this.scheduleUpdateNotification();
 
-        // Rodar a checagem de atualização de forma assíncrona
+        // Run update check asynchronously
         if (isFolia()) {
             Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> check());
         } else {
@@ -80,15 +83,15 @@ public class UpdateChecker {
             String[] placeholders = {"%release_link%", "%current_version%", "%latest_version%"};
             String[] replacements = {getLastRelease().getHtml_url(), getCurrentVersion(), getLastRelease().getTag_name()};
 
-            BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
-                Bukkit.getConsoleSender().sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
-            });
+            for (String s : BetterDeathScreen.getMessages().getUpdateAvailable()) {
+                Bukkit.getConsoleSender().sendMessage(StringUtils.replaceEach(s, placeholders, replacements));
+            }
 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (!player.hasPermission(BetterDeathScreen.getConfiguration().getAdminPermission())) continue;
-                BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
+                for (String message : BetterDeathScreen.getMessages().getUpdateAvailable()) {
                     player.sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
-                });
+                }
             }
         }
     }
@@ -115,14 +118,14 @@ public class UpdateChecker {
 
     public void check() {
         try {
-            this.connect(new URL(GITHUB_LINK));
-        } catch (MalformedURLException ignored) {
+            this.connect(new URI(GITHUB_LINK).toURL());
+        } catch (URISyntaxException | MalformedURLException ignored) {
         }
         if (this.response == null) return;
 
         JsonElement element = JsonParser.parseString(response);
         JsonArray array = element.getAsJsonArray();
-        if (array.size() == 0) return;
+        if (array.isEmpty()) return;
 
         GitHubRelease lastRelease = SERIALIZER.fromJson(array.get(0), GitHubRelease.class);
 

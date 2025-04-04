@@ -17,6 +17,8 @@ import org.bukkit.GameMode;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
+
 public class BetterDeathScreen extends JavaPlugin {
 
     private static final BukkitConfig CONFIG = new BukkitConfig();
@@ -60,9 +62,9 @@ public class BetterDeathScreen extends JavaPlugin {
         setupListeners();
         new UpdateChecker(this);
 
-        getCommand("bds").setExecutor(new MainCommand());
-        getCommand("bds").setTabCompleter(new MainTabCompleter());
-        //new Metrics(this, 25345);
+        Objects.requireNonNull(getCommand("bds")).setExecutor(new MainCommand());
+        Objects.requireNonNull(getCommand("bds")).setTabCompleter(new MainTabCompleter());
+        new Metrics(this, 25345);
 
         if (getServer().isHardcore()) {
             getServer().getOnlinePlayers().forEach(player -> {
