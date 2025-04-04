@@ -1,6 +1,5 @@
 package com.github.victortedesco.betterdeathscreen.bukkit.utils;
 
-import com.cryptomorin.xseries.ReflectionUtils;
 import com.github.victortedesco.betterdeathscreen.bukkit.BetterDeathScreen;
 import com.github.victortedesco.betterdeathscreen.bukkit.api.BetterDeathScreenAPI;
 import com.github.victortedesco.betterdeathscreen.bukkit.api.manager.PlayerManager;
@@ -12,16 +11,23 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import java.util.HashSet;
+import java.util.Set;
 
-public final class RespawnTasks {
+public final class RespawnTasks implements Listener {
 
     private final PlayerManager playerManager;
     private final BukkitConfig config;
     private final BukkitMessages messages;
     private final Randomizer randomizer;
+    private final Set<Player> respawnCooldownPlayers = new HashSet<>();
 
     public RespawnTasks() {
         this.playerManager = BetterDeathScreenAPI.getPlayerManager();
@@ -31,46 +37,72 @@ public final class RespawnTasks {
     }
 
     public void startCountdown(Player player) {
-        new BukkitRunnable() {
-            final String randomCountdownSound = randomizer.getRandomItemFromList(config.getCountdownSounds());
-            int time = config.getRespawnTime();
+        final String randomCountdownSound = randomizer.getRandomItemFromList(config.getCountdownSounds());
+        final int[] time = { config.getRespawnTime() };
+        respawnCooldownPlayers.add(player);
 
-            @Override
-            public void run() {
-                time--;
-                if (!player.isOnline() || !BetterDeathScreenAPI.getPlayerManager().isDead(player)) {
-                    cancel();
-                    return;
-                }
-                if (!Bukkit.isHardcore()) {
-                    if (player.hasPermission(config.getInstantRespawnPermission())) time = 0;
-                    if (time > 1) {
-                        playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(), messages.getNonHardcoreCountdown().replace("%time%", time + messages.getTimePlural()), 1);
-                        playerManager.playSound(player, randomCountdownSound, false);
-                    }
-                    if (time == 1) {
-                        playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(), messages.getNonHardcoreCountdown().replace("%time%", time + messages.getTimeSingular()), 1);
-                        playerManager.playSound(player, randomCountdownSound, false);
-                    }
-                    if (time <= 0) {
-                        BetterDeathScreen.getRespawnTasks().performRespawn(player, false);
-                        cancel();
-                    }
-                } else {
-                    if (player.getGameMode() != GameMode.SPECTATOR) {
-                        performRespawn(player, true);
-                        cancel();
+        Bukkit.getRegionScheduler().runAtFixedRate(
+                BetterDeathScreen.getInstance(),
+                player.getLocation(),
+                (ScheduledTask task) -> {
+                    time[0]--;
+
+                    if (!player.isOnline() || !BetterDeathScreenAPI.getPlayerManager().isDead(player)) {
+                        task.cancel();
+                        respawnCooldownPlayers.remove(player);
                         return;
                     }
-                    if (config.getCountdownMessageType().equalsIgnoreCase("ACTIONBAR") && time <= 0) {
-                        playerManager.sendCustomMessage(player, null, "ACTIONBAR", messages.getHardcoreCountdown(), 0);
+
+                    if (!Bukkit.isHardcore()) {
+                        if (player.hasPermission(config.getInstantRespawnPermission())) {
+                            time[0] = 0;
+                        }
+
+                        if (time[0] > 1) {
+                            playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(),
+                                    messages.getNonHardcoreCountdown().replace("%time%", time[0] + messages.getTimePlural()), 1);
+                            playerManager.playSound(player, randomCountdownSound, false);
+                        } else if (time[0] == 1) {
+                            playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(),
+                                    messages.getNonHardcoreCountdown().replace("%time%", time[0] + messages.getTimeSingular()), 1);
+                            playerManager.playSound(player, randomCountdownSound, false);
+                        }
+
+                        if (time[0] <= 0) {
+                            BetterDeathScreen.getRespawnTasks().performRespawn(player, false);
+                            task.cancel();
+                            respawnCooldownPlayers.remove(player);
+                        }
+
+                    } else {
+                        if (player.getGameMode() != GameMode.SPECTATOR) {
+                            performRespawn(player, true);
+                            task.cancel();
+                            respawnCooldownPlayers.remove(player);
+                            return;
+                        }
+
+                        if (config.getCountdownMessageType().equalsIgnoreCase("ACTIONBAR") && time[0] <= 0) {
+                            playerManager.sendCustomMessage(player, null, "ACTIONBAR", messages.getHardcoreCountdown(), 0);
+                        }
+
+                        if (!config.getCountdownMessageType().equalsIgnoreCase("ACTIONBAR") && time[0] == 0) {
+                            playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(),
+                                    messages.getHardcoreCountdown(), 86400);
+                        }
                     }
-                    if (!config.getCountdownMessageType().equalsIgnoreCase("ACTIONBAR") && time == 0) {
-                        playerManager.sendCustomMessage(player, null, config.getCountdownMessageType(), messages.getHardcoreCountdown(), 86400);
-                    }
-                }
-            }
-        }.runTaskTimer(BetterDeathScreen.getInstance(), 20L, 20L);
+                },
+                20L,
+                20L
+        );
+    }
+
+    @EventHandler
+    public void onPlayerToggleSneak(PlayerToggleSneakEvent event) {
+        Player player = event.getPlayer();
+        if (respawnCooldownPlayers.contains(player)) {
+            event.setCancelled(true);
+        }
     }
 
     public void sendPlayerRespawnEvent(@NotNull Player player) {
@@ -87,11 +119,7 @@ public final class RespawnTasks {
                 anchorSpawn = true;
             }
         }
-        playerRespawnEvent = new PlayerRespawnEvent(player, respawnLocation, bedSpawn);
-        if (ReflectionUtils.MINOR_NUMBER > 15)
-            playerRespawnEvent = new PlayerRespawnEvent(player, respawnLocation, bedSpawn, anchorSpawn);
-        if ((ReflectionUtils.MINOR_NUMBER == 19 && ReflectionUtils.PATCH_NUMBER == 4) || ReflectionUtils.MINOR_NUMBER > 19)
-            playerRespawnEvent = new PlayerRespawnEvent(player, respawnLocation, bedSpawn, anchorSpawn, PlayerRespawnEvent.RespawnReason.DEATH);
+        playerRespawnEvent = new PlayerRespawnEvent(player, respawnLocation, bedSpawn, anchorSpawn, PlayerRespawnEvent.RespawnReason.DEATH);
 
         Bukkit.getPluginManager().callEvent(playerRespawnEvent);
     }
@@ -104,6 +132,7 @@ public final class RespawnTasks {
             BetterDeathScreen.getDeathTasks().changeAttributes(player);
             sendPlayerRespawnEvent(player);
             playerManager.playSound(player, randomizer.getRandomItemFromList(config.getRespawnSounds()), false);
+            respawnCooldownPlayers.remove(player);
             if (!Bukkit.isHardcore()) {
                 Bukkit.getOnlinePlayers().forEach(onlinePlayer -> onlinePlayer.showPlayer(player));
             }

@@ -1,6 +1,5 @@
 package com.github.victortedesco.betterdeathscreen.bukkit;
 
-import com.cryptomorin.xseries.ReflectionUtils;
 import com.github.victortedesco.betterdeathscreen.bukkit.api.BetterDeathScreenAPI;
 import com.github.victortedesco.betterdeathscreen.bukkit.commands.MainCommand;
 import com.github.victortedesco.betterdeathscreen.bukkit.commands.MainTabCompleter;
@@ -15,7 +14,6 @@ import com.github.victortedesco.betterdeathscreen.bukkit.utils.updater.UpdateChe
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -57,24 +55,15 @@ public class BetterDeathScreen extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        boolean forceDisable = false;
         createAndLoadConfigurationsAndMessages();
-        try {
-            Player.class.getMethod("spigot");
-        } catch (NoSuchMethodException exception) {
-            forceDisable = true;
-        }
-        if (ReflectionUtils.MINOR_NUMBER < 8) forceDisable = true;
-        if (forceDisable) {
-            getMessages().getIncompatible().forEach(BetterDeathScreen::sendConsoleMessage);
-            getServer().getScheduler().runTaskLater(this, () -> getServer().getPluginManager().disablePlugin(this), 1L);
-            return;
-        }
+
         setupListeners();
-        new UpdateChecker();
+        new UpdateChecker(this);
+
         getCommand("bds").setExecutor(new MainCommand());
         getCommand("bds").setTabCompleter(new MainTabCompleter());
-        new Metrics(this, 17249);
+        //new Metrics(this, 25345);
+
         if (getServer().isHardcore()) {
             getServer().getOnlinePlayers().forEach(player -> {
                 if (player.getGameMode() == GameMode.SPECTATOR && !player.hasPermission(getConfiguration().getAdminPermission())) {
@@ -83,14 +72,15 @@ public class BetterDeathScreen extends JavaPlugin {
                 }
             });
         }
+
         getMessages().getEnabled().forEach(BetterDeathScreen::sendConsoleMessage);
     }
 
     @Override
     public void onDisable() {
-        getServer().getOnlinePlayers().forEach(player -> {
-            BetterDeathScreen.getRespawnTasks().performRespawn(player, false);
-        });
+        getServer().getOnlinePlayers().forEach(player ->
+                BetterDeathScreen.getRespawnTasks().performRespawn(player, false)
+        );
         getMessages().getDisabled().forEach(BetterDeathScreen::sendConsoleMessage);
     }
 
@@ -111,10 +101,7 @@ public class BetterDeathScreen extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerTeleportListener(), this);
 
-        if (ReflectionUtils.MINOR_NUMBER > 11)
-            Bukkit.getPluginManager().registerEvents(new EntityPickupItemListener(), this);
-        else
-            Bukkit.getPluginManager().registerEvents(new PlayerPickupItemListener(), this);
+        Bukkit.getPluginManager().registerEvents(new EntityPickupItemListener(), this);
         new LoginPacketListener();
     }
 }

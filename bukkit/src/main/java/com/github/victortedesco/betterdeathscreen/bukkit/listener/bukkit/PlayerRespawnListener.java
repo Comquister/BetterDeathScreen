@@ -1,8 +1,5 @@
 package com.github.victortedesco.betterdeathscreen.bukkit.listener.bukkit;
 
-import com.cryptomorin.xseries.ReflectionUtils;
-import com.cryptomorin.xseries.messages.ActionBar;
-import com.cryptomorin.xseries.messages.Titles;
 import net.md_5.bungee.api.chat.TranslatableComponent;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
@@ -13,6 +10,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.potion.PotionEffectType;
 import org.jetbrains.annotations.NotNull;
+import org.bukkit.Bukkit;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -29,24 +27,27 @@ public class PlayerRespawnListener implements Listener {
     public void onPlayerRespawnMonitorPriority(@NotNull PlayerRespawnEvent event) {
         Player player = event.getPlayer();
 
-        Titles.clearTitle(player);
-        ActionBar.clearActionBar(player);
-
         if (player.getBedSpawnLocation() == null) {
             if (!getBedNotFoundMessageSent().contains(player)) {
-                TranslatableComponent noBed = new TranslatableComponent("tile.bed.notValid");
-                if (ReflectionUtils.MINOR_NUMBER > 12)
-                    noBed = new TranslatableComponent("block.minecraft.bed.not_valid");
-                if (ReflectionUtils.MINOR_NUMBER > 15)
-                    noBed = new TranslatableComponent("block.minecraft.spawn.not_valid");
+                TranslatableComponent noBed = new TranslatableComponent("block.minecraft.spawn.not_valid");
                 player.spigot().sendMessage(noBed);
                 getBedNotFoundMessageSent().add(player);
             }
-        } else getBedNotFoundMessageSent().remove(player);
+        } else {
+            getBedNotFoundMessageSent().remove(player);
+        }
+
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
         player.setAllowFlight(player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR);
-        player.teleport(event.getRespawnLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+
+        // Use teleportAsync() instead of teleport()
+        player.teleportAsync(event.getRespawnLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN)
+                .exceptionally(ex -> {
+                    Bukkit.getLogger().warning("Failed to teleport player asynchronously: " + ex.getMessage());
+                    return null;
+                });
     }
+
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerRespawnHighestPriority(@NotNull PlayerRespawnEvent event) {

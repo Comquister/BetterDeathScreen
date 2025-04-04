@@ -1,9 +1,5 @@
 package com.github.victortedesco.betterdeathscreen.bukkit.api.manager;
 
-import com.cryptomorin.xseries.ReflectionUtils;
-import com.cryptomorin.xseries.XSound;
-import com.cryptomorin.xseries.messages.ActionBar;
-import com.cryptomorin.xseries.messages.Titles;
 import lombok.Getter;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
@@ -30,6 +26,8 @@ public class PlayerManager {
         return getDeadPlayers().contains(player);
     }
 
+    int minorVersion = 21;
+
     public void playSound(Player player, @NotNull String string, boolean silent) {
         if (string.isEmpty()) return;
         String[] array = string.split(";");
@@ -45,12 +43,11 @@ public class PlayerManager {
         if (silent) volume = 0;
 
         try {
-            Sound bukkitSound = XSound.matchXSound(sound).orElse(null).parseSound();
+            Sound bukkitSound = Sound.valueOf(sound.toUpperCase());
             player.playSound(player.getLocation(), bukkitSound, volume, pitch);
-            return;
-        } catch (NullPointerException ignored) {
+        } catch (IllegalArgumentException ignored) {
+            player.playSound(player.getLocation(), sound, volume, pitch);
         }
-        player.playSound(player.getLocation(), sound, volume, pitch);
     }
 
     public void sendCustomMessage(Player player, Player placeholderTarget, String type, String message, int timeSeconds) {
@@ -60,7 +57,7 @@ public class PlayerManager {
             if (messageType == MessageType.NONE) return;
             if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null && placeholderTarget != null)
                 message = PlaceholderAPI.setPlaceholders(placeholderTarget, message);
-            if (messageType == MessageType.ACTIONBAR) ActionBar.sendActionBar(player, message);
+            if (messageType == MessageType.ACTIONBAR) player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, net.md_5.bungee.api.chat.TextComponent.fromLegacyText(message));
             if (messageType == MessageType.TITLE) {
                 String[] array = message.split("\n");
                 String title = null;
@@ -71,7 +68,7 @@ public class PlayerManager {
                     title = array[0];
                     subtitle = array[1];
                 }
-                Titles.sendTitle(player, 5, 20 * timeSeconds, 5, title, subtitle);
+                player.sendTitle(title, subtitle, 5, 20 * timeSeconds, 5);
             }
             if (messageType == MessageType.CHAT) player.sendMessage(message);
         } catch (Exception exception) {
@@ -79,28 +76,14 @@ public class PlayerManager {
         }
     }
 
-    /**
-     * Get the max health of the player, returns the GENERIC_MAX_HEALTH attribute on versions newer than 1.8
-     */
     public double getMaxHealth(Player player) {
-        if (ReflectionUtils.MINOR_NUMBER > 8)
-            return player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue();
-        return player.getMaxHealth();
+        return player.getAttribute(Attribute.MAX_HEALTH).getValue();
     }
 
-    /**
-     * Get the inventory of the player without null stacks
-     */
     public List<ItemStack> getFilteredInventory(Player player) {
         List<ItemStack> inventory = Arrays.stream(player.getInventory().getContents())
                 .filter(stack -> !isStackEmpty(stack))
                 .collect(Collectors.toList());
-        if (ReflectionUtils.MINOR_NUMBER <= 8) {
-            List<ItemStack> armor = Arrays.stream(player.getInventory().getArmorContents())
-                    .filter(stack -> !isStackEmpty(stack))
-                    .collect(Collectors.toList());
-            inventory.addAll(armor);
-        }
         return inventory;
     }
 
@@ -108,17 +91,10 @@ public class PlayerManager {
         return itemStack == null || itemStack.getType() == Material.AIR || itemStack.getAmount() == 0;
     }
 
-    /**
-     * Get if the player is using a Totem of Undying in the main hand or in the offhand
-     */
     public boolean isUsingTotem(Player player) {
-        if (ReflectionUtils.MINOR_NUMBER >= 11) {
-            Material mainHand = player.getInventory().getItemInMainHand().getType();
-            Material offHand = player.getInventory().getItemInOffHand().getType();
-
-            return mainHand.toString().contains("TOTEM") || offHand.toString().contains("TOTEM");
-        }
-        return false;
+        Material mainHand = player.getInventory().getItemInMainHand().getType();
+        Material offHand = player.getInventory().getItemInOffHand().getType();
+        return mainHand == Material.TOTEM_OF_UNDYING || offHand == Material.TOTEM_OF_UNDYING;
     }
 
     public enum MessageType {

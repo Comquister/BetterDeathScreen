@@ -6,7 +6,8 @@ author: Tedesk
 load: POSTWORLD
 depend: [ ProtocolLib ]
 softdepend: [ PlaceholderAPI ]
-api-version: 1.13
+api-version: 1.21
+folia-supported: true
 website: https://github.com/victortedesco/BetterDeathScreen
 
 commands:

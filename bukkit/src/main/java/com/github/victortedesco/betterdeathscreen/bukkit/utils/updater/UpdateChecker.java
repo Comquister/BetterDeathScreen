@@ -7,7 +7,6 @@ import lombok.Setter;
 import org.apache.commons.lang.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,42 +14,83 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
 @Getter
 public class UpdateChecker {
-
     private static final String GITHUB_LINK = "https://api.github.com/repos/VictorTedesco/BetterDeathScreen/releases";
     private static final Gson SERIALIZER = new GsonBuilder().serializeNulls().create();
-
     private final String currentVersion = BetterDeathScreen.getInstance().getDescription().getVersion();
+    private final BetterDeathScreen plugin;
 
     @Setter
     private GitHubRelease lastRelease;
 
     private String response;
 
-    public UpdateChecker() {
+    public UpdateChecker(BetterDeathScreen plugin) {
+        this.plugin = plugin; // ✅ Agora está correto
         this.check();
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (canUpdate() && BetterDeathScreen.getConfiguration().isAllowedToNotifyUpdates()) {
-                    String[] placeholders = {"%release_link%", "%current_version%", "%latest_version%"};
-                    String[] replacements = {getLastRelease().getHtml_url(), getCurrentVersion(), getLastRelease().getTag_name()};
+        this.scheduleUpdateNotification();
 
-                    BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
-                        Bukkit.getConsoleSender().sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
-                    });
+        // Rodar a checagem de atualização de forma assíncrona
+        if (isFolia()) {
+            Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> check());
+        } else {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, this::check);
+        }
+    }
 
-                    for (Player player : Bukkit.getOnlinePlayers()) {
-                        if (!player.hasPermission(BetterDeathScreen.getConfiguration().getAdminPermission())) continue;
-                        BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
-                            player.sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
-                        });
-                    }
-                }
+
+    private void scheduleUpdateNotification() {
+        long ticks = 20L * 60L * 30L; // 30 minutos em ticks
+        long millis = ticks * 50; // Converte ticks para milissegundos
+
+        if (isFolia()) {
+            // Se for Folia, usar GlobalRegionScheduler com milissegundos
+            this.plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(
+                    this.plugin,
+                    task -> notifyUpdate(),
+                    5000, // 5 segundos convertidos para milissegundos
+                    millis        // 30 minutos em milissegundos
+            );
+        } else {
+            // Caso contrário, usar BukkitScheduler com ticks
+            Bukkit.getScheduler().runTaskTimer(
+                    this.plugin,
+                    this::notifyUpdate,
+                    20L * 5L, // 5 segundos em ticks
+                    ticks     // 30 minutos em ticks
+            );
+        }
+    }
+
+
+    private boolean isFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServerInitEvent"); // Verifica se a classe do Folia está presente
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    private void notifyUpdate() {
+        if (canUpdate() && BetterDeathScreen.getConfiguration().isAllowedToNotifyUpdates()) {
+            String[] placeholders = {"%release_link%", "%current_version%", "%latest_version%"};
+            String[] replacements = {getLastRelease().getHtml_url(), getCurrentVersion(), getLastRelease().getTag_name()};
+
+            BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
+                Bukkit.getConsoleSender().sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
+            });
+
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (!player.hasPermission(BetterDeathScreen.getConfiguration().getAdminPermission())) continue;
+                BetterDeathScreen.getMessages().getUpdateAvailable().forEach(message -> {
+                    player.sendMessage(StringUtils.replaceEach(message, placeholders, replacements));
+                });
             }
-        }.runTaskTimer(BetterDeathScreen.getInstance(), 20L * 5L, 20L * 60L * 30L);
+        }
     }
 
     public void connect(URL url) {
@@ -80,7 +120,7 @@ public class UpdateChecker {
         }
         if (this.response == null) return;
 
-        JsonElement element = new JsonParser().parse(response);
+        JsonElement element = JsonParser.parseString(response);
         JsonArray array = element.getAsJsonArray();
         if (array.size() == 0) return;
 

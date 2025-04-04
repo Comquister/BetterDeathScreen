@@ -10,9 +10,7 @@ import com.github.victortedesco.betterdeathscreen.bukkit.utils.DeathTasks;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Statistic;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -36,11 +34,18 @@ public class EntityDamageListener implements Listener {
         this.deathTasks = BetterDeathScreen.getDeathTasks();
     }
 
+    private boolean isFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServerInitEvent");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
     @EventHandler
     public void onEntityDamageByEntity(@NotNull EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player) {
-            Player damager = (Player) event.getDamager();
-
+        if (event.getDamager() instanceof Player damager) {
             if (playerManager.isDead(damager)) {
                 event.setCancelled(true);
                 if (config.isAllowedToSpectate()) {
@@ -53,19 +58,27 @@ public class EntityDamageListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(@NotNull EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
+        if (!(event.getEntity() instanceof Player player)) return;
 
-            if (playerManager.isDead(player)) {
-                event.setCancelled(true);
-                player.setFireTicks(0);
+        if (playerManager.isDead(player)) {
+            event.setCancelled(true);
+            player.setFireTicks(0);
+            return;
+        }
+
+        if (isValidDeath(player, event)) {
+            event.setDamage(0);
+
+            if (isFolia()) {
+                Bukkit.getRegionScheduler().execute(
+                        BetterDeathScreen.getInstance(),
+                        player.getLocation(),
+                        () -> handlePlayerDeath(player, event)
+                );
             } else {
-                if (isValidDeath(player, event)) {
-                    event.setDamage(0);
-                    Bukkit.getScheduler().runTaskLater(BetterDeathScreen.getInstance(), () -> {
-                        handlePlayerDeath(player, event);
-                    }, 1L);
-                }
+                Bukkit.getScheduler().runTaskLater(BetterDeathScreen.getInstance(), () -> {
+                    handlePlayerDeath(player, event);
+                }, 1L);
             }
         }
     }
@@ -79,28 +92,33 @@ public class EntityDamageListener implements Listener {
         player.setAllowFlight(config.isAllowedToFly());
         player.setFlying(config.isAllowedToFly());
 
-        if (event instanceof EntityDamageByEntityEvent) {
-            Entity killer = ((EntityDamageByEntityEvent) event).getDamager();
-            if (killer instanceof Projectile) {
-                Projectile projectile = (Projectile) killer;
-                if (projectile.getShooter() instanceof Entity)
-                    killer = (Entity) projectile.getShooter();
-            }
-            if (killer instanceof Player) {
-                Player playerKiller = (Player) killer;
-                playerKiller.incrementStatistic(Statistic.PLAYER_KILLS, 1);
-                playerKiller.incrementStatistic(Statistic.DAMAGE_DEALT, (int) Math.max(playerHealth, 1));
-                playerManager.playSound(player, randomizer.getRandomItemFromList(config.getKillSounds()), false);
-                playerManager.sendCustomMessage(player, playerKiller, config.getKilledByPlayerMessageType(),
-                        randomizer.getRandomItemFromList(messages.getKilledByPlayer()), time);
-                playerManager.sendCustomMessage(playerKiller, player, config.getKillMessageType(),
-                        randomizer.getRandomItemFromList(messages.getKill()), 1);
-            }
-            if (config.isForcedToSpectateKillerOnDeath()) {
-                player.setGameMode(GameMode.SPECTATOR);
-                player.setSpectatorTarget(killer);
-            }
+        Entity killer = getKiller(event);
+
+        if (killer instanceof Player playerKiller) {
+            playerKiller.incrementStatistic(Statistic.PLAYER_KILLS, 1);
+            playerKiller.incrementStatistic(Statistic.DAMAGE_DEALT, (int) Math.max(playerHealth, 1));
+            playerManager.playSound(player, randomizer.getRandomItemFromList(config.getKillSounds()), false);
+            playerManager.sendCustomMessage(player, playerKiller, config.getKilledByPlayerMessageType(),
+                    randomizer.getRandomItemFromList(messages.getKilledByPlayer()), time);
+            playerManager.sendCustomMessage(playerKiller, player, config.getKillMessageType(),
+                    randomizer.getRandomItemFromList(messages.getKill()), 1);
         }
+
+        if (config.isForcedToSpectateKillerOnDeath() && killer != null) {
+            player.setGameMode(GameMode.SPECTATOR);
+            player.setSpectatorTarget(killer);
+        }
+    }
+
+    private Entity getKiller(EntityDamageEvent event) {
+        if (event instanceof EntityDamageByEntityEvent entityEvent) {
+            Entity killer = entityEvent.getDamager();
+            if (killer instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooter) {
+                return shooter;
+            }
+            return killer;
+        }
+        return null;
     }
 
     private boolean isValidDeath(@NotNull Player player, @NotNull EntityDamageEvent event) {
