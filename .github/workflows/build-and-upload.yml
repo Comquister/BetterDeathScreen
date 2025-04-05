@@ -22,6 +22,11 @@ jobs:
           server-id: github
           cache: 'maven'
 
+      - name: Check Java and Maven versions
+        run: |
+          java -version
+          mvn -v
+
       - name: Cache local Maven repository
         uses: actions/cache@v3
         with:
