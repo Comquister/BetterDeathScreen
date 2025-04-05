@@ -64,6 +64,7 @@ public class BetterDeathScreen extends JavaPlugin {
 
         Objects.requireNonNull(getCommand("bds")).setExecutor(new MainCommand());
         Objects.requireNonNull(getCommand("bds")).setTabCompleter(new MainTabCompleter());
+
         new Metrics(this, 25345);
 
         if (getServer().isHardcore()) {
